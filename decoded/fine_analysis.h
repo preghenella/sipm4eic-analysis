@@ -20,6 +20,7 @@ std::map<TString,TH2F*>                                     kFineTuneRawHistogra
 const TString   output_preprocess_fine_analysis_directory       = output_preprocess_directory                       + TString("/FineAnalysis/");
 const TString   output_preprocess_fine_analysis_file_raw        = output_preprocess_fine_analysis_directory         + TString("/%s/FineTuneRaw.root");
 const TString   output_preprocess_fine_analysis_file_rslt       = output_preprocess_fine_analysis_directory         + TString("/%s/FineTuneResults.root");
+const TString   output_preprocess_fine_analysis_file_check      = output_preprocess_fine_analysis_directory         + TString("/%s/FineTuneResultsCheck.root");
 const TString   output_preprocess_fine_analysis_graphics_dir    = output_preprocess_fine_analysis_directory         + TString("/%s/FitCheck/");
 TF1*            fine_analysis_fit_function                      = new TF1("fine_analysis_fit_function", "[0]*(1./(exp((x-[1])/[2])+1))*(1./(exp(([3]-x)/[4])+1))", 20., 150.);
 //
@@ -344,11 +345,61 @@ get_fine_tune_parameters ( TString kRunTag ) {
     if ( kFileOut->IsOpen() )  { return (TH2F*)(kFileOut->Get("kFine_All_Tune_Params")); }
     return run_fine_tune_analysis( kRunTag, "", "", false );
 }
-/*
 template< typename TH2_Type = TH2F >
 TH2_Type*
 check_normalisation_fine_tune
- ( TString kRunTag, TString kOutputFileName, TString kOutputGraphics ) {
+ ( std::vector<TString> kInputFileNames, TString kRunTag, TString kOutputFileName="", bool kRecalculate=false ) {
+    //!  Check the output has already been produced
+    TFile*  kFileOut = new TFile( Form (output_preprocess_fine_analysis_file_check,kRunTag.Data()));
+    //!  (Re)Calculate if requested
+    cout << Form("%s%s",output_preprocess_fine_analysis_directory.Data(), Form (output_preprocess_fine_analysis_file_raw,kRunTag.Data())) << endl;
+    cout << "[INFO] Looking if fine tune histogram for tuning is cached" << endl;
+    if ( kFileOut->IsOpen() && !kRecalculate )  { cout << "[INFO] Found! Using cached" << endl; return (TH2F*)(kFileOut->Get("hFine_All")); }
+    else { cout << "[INFO] Not found! Re-generating" << endl; delete  kFileOut; }
+    //! histogram with fine distribution
+    TH2_Type* hFine_All_Tuned = new TH2_Type("hFine_All_Tuned", ";index;fine", kGlobalIndexRange, 0, kGlobalIndexRange, 189, -1, 2 );
+    //! Loop on filenames
+    for ( auto kCurrentFileName : kInputFileNames ) {
+        std::cout << "[INFO] Opening file: " << kCurrentFileName.Data() << std::endl;
+        //! Load File
+        auto kCurrentFile = TFile::Open(kCurrentFileName);
+        if ( !kCurrentFile || !kCurrentFile->IsOpen() ) {
+            std::cout << "[WARNING] Opening file: " << kCurrentFileName.Data() << " failed!" << std::endl;
+            continue;
+        }
+        //! Load Tree
+        data_t      kCurrentData;
+        TTree*      kCurrentTree = (TTree *)kCurrentFile->Get("alcor");
+        if ( !kCurrentTree ) {
+            std::cout << "[WARNING] No \"alcor\" tree in file: " << kCurrentFileName.Data() << ". Loading failed!" << std::endl;
+            continue;
+        }
+        //! Get Entries and loop to fill histogram
+        auto nEvents = kCurrentTree->GetEntries();
+        load_tree( kCurrentTree, kCurrentData );
+        for (int iEv = 0; iEv < nEvents; ++iEv) {
+            kCurrentTree->GetEntry(iEv);
+            int iCurrentIndex = get_global_index( kCurrentData.fifo, kCurrentData.pixel, kCurrentData.column, kCurrentData.tdc );
+            hFine_All_Tuned->Fill( iCurrentIndex, calculate_calibrated_phase(kCurrentData.fine,kRunTag,iCurrentIndex) );
+        }
+        kCurrentFile->Close();
+    }
+    //! Save custom output
+    if ( kOutputFileName.Length() != 0 ) {
+        // system(Form("mkdir -p %s", kOutputFileName.Data())); //! TODO: Create folder (?)
+        kFileOut = new TFile( kOutputFileName, "RECREATE" );
+        hFine_All_Tuned->Write();
+        kFileOut->Close();
+    } else {
+        system(Form("mkdir -p %s/%s",output_preprocess_fine_analysis_directory.Data(),kRunTag.Data()));
+        kFileOut = new TFile( Form (output_preprocess_fine_analysis_file_check,kRunTag.Data()), "RECREATE" );
+        hFine_All_Tuned->Write();
+        kFileOut->Close();
+    }
+    return hFine_All_Tuned;
+    
+    
+    /*
     //! Create output
     TH2_Type* hFine_All_Tuned = new TH2_Type("hFine_All_Tuned", "hFine_All_Tuned", kGlobalIndexRange, -0.5, kGlobalIndexRange-0.5, 189, -1, 2 );
     //! Loop on filenames
@@ -393,6 +444,14 @@ check_normalisation_fine_tune
     //! Run in Batch mode
     gROOT->SetBatch(false);
     return hFine_All_Tuned;
+     */
 }
- */
+template< typename TH2_Type = TH2F >
+TH2_Type*
+check_normalisation_fine_tune
+ ( TString kRunTag, TString kOutputFileName="", bool kRecalculate=false ) {
+    std::vector<TString> kInputFileNames;
+    for ( Int_t iFile = 0; iFile < 24; iFile++ ) { kInputFileNames.push_back(Form(intput_rawdata_decoded_file,kRunTag.Data(),iFile)); }
+    return check_normalisation_fine_tune<TH2_Type>( kInputFileNames, kRunTag, kOutputFileName, kRecalculate );
+}
 #endif
