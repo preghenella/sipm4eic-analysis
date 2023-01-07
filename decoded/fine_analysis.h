@@ -32,7 +32,7 @@ double  calculate_calibrated_phase      ( int kFineParameter, TString kRunTag, i
 template< typename TH1_Type = TH1F >
 int     get_fit_bump                    ( TH1_Type* histo, double critical_value, int bin_step );
 //  --- Getters
-std::pair<double,double>
+std::tuple<double,double>
         get_fine_calibration            ( global_identifier_t kFilters );
 double  get_fine_calibration_min        ( global_identifier_t kFilters );
 double  get_fine_calibration_max        ( global_identifier_t kFilters );
@@ -102,9 +102,9 @@ get_fit_bump
 }
 //
 //  Getters
-double  get_fine_calibration_min        ( global_identifier_t kFilters ) { return get_fine_calibration(kFilters).first;  };
-double  get_fine_calibration_max        ( global_identifier_t kFilters ) { return get_fine_calibration(kFilters).second; };
-std::pair<double,double>
+double  get_fine_calibration_min        ( global_identifier_t kFilters ) { return get<0>(get_fine_calibration(kFilters));   };
+double  get_fine_calibration_max        ( global_identifier_t kFilters ) { return get<1>(get_fine_calibration(kFilters));   };
+std::tuple<double,double>
 get_fine_calibration
  ( global_identifier_t kFilters ) {
     if ( kFineTuneParameters.find( kFilters ) == kFineTuneParameters.end() ) set_fine_calibration( kFilters );

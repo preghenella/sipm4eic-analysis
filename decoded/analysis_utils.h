@@ -212,7 +212,7 @@ std::tuple<Int_t,Int_t,Int_t,Int_t>
 uGetInfos
 ( Int_t iIndex ) {
     //! Result { Chip, Pixel, Column, TDC }
-    std::tuple<Int_t,Int_t,Int_t,Int_t> kResult = {-1,-1,-1,-1};
+    std::tuple<Int_t,Int_t,Int_t,Int_t> kResult;
     get<0>(kResult) = (iIndex/128)%6;
     get<1>(kResult) = (iIndex/4)%4;
     get<2>(kResult) = (iIndex/16)%8;
